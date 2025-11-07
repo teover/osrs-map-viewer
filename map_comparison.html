@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>OSRS Map Comparison - Old vs Sailing Beta</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            overflow: hidden;
+            touch-action: none;
+        }
+        
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow: hidden;
+            cursor: grab;
+            touch-action: none;
+        }
+        
+        #canvas-container.dragging {
+            cursor: grabbing;
+        }
+        
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+        }
+        
+        #controls {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #ffb000;
+            font-size: 14px;
+            z-index: 1000;
+            min-width: 250px;
+        }
+        
+        #controls h3 {
+            margin: 0 0 10px 0;
+            color: #ffb000;
+            font-size: 16px;
+        }
+        
+        .control-group {
+            margin: 10px 0;
+        }
+        
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #aaa;
+            font-size: 12px;
+        }
+        
+        .control-group select {
+            width: 100%;
+            padding: 5px;
+            background: #333;
+            color: #fff;
+            border: 1px solid #555;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        
+        #info {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 1000;
+        }
+        
+        .info-row {
+            margin: 3px 0;
+        }
+        
+        #loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 30px 50px;
+            border-radius: 10px;
+            border: 2px solid #ffb000;
+            z-index: 2000;
+            text-align: center;
+        }
+        
+        .spinner {
+            border: 4px solid #333;
+            border-top: 4px solid #ffb000;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div class="spinner"></div>
+        <div>Loading maps...</div>
+    </div>
+    
+    <div id="controls">
+        <h3>Map Comparison</h3>
+        <div class="control-group">
+            <label for="map1Select">Left/Base Map:</label>
+            <select id="map1Select">
+                <option value="previous">4 August 2025 Previous map</option>
+                <option value="sailingBeta">26 June 2025 Sailing beta</option>
+                <option value="current" selected>07.11 Current Sailing Map</option>
+                <option value="rs3">11 April 2023 Runescape 3</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label for="map2Select">Right/Overlay Map:</label>
+            <select id="map2Select">
+                <option value="previous" selected>4 August 2025 Previous map</option>
+                <option value="sailingBeta">26 June 2025 Sailing beta</option>
+                <option value="current">07.11 Current Sailing Map</option>
+                <option value="rs3">11 April 2023 Runescape 3</option>
+            </select>
+        </div>
+    </div>
+    
+    <div id="canvas-container">
+        <canvas id="canvas"></canvas>
+    </div>
+    
+    <div id="info">
+        <div class="info-row">Map 1: <span id="oldMapInfo">-</span></div>
+        <div class="info-row">Map 2: <span id="newMapInfo">-</span></div>
+        <div class="info-row">Position: <span id="posInfo">-</span></div>
+    </div>
+    
+    <script>
+        // Map configurations based on analysis
+        const MAPS = {
+            previous: {
+                path: 'osrs_old_map.png',
+                name: '4 August 2025 Previous map',
+                width: 8712,
+                height: 4912,
+                // Identity transform (reference map)
+                scaleFactor: 1.0,
+                offsetX: 0,
+                offsetY: 0
+            },
+            sailingBeta: {
+                path: 'Sailing_beta_world_map.png',
+                name: '26 June 2025 Sailing beta',
+                width: 12800,
+                height: 8704,
+                // Transform relative to previous map
+                scaleFactor: 1.3334,
+                offsetX: 620.21,
+                offsetY: 107.22
+            },
+            current: {
+                path: 'osrs_stitched_map_blended.png',
+                name: '07.11 Current Sailing Map',
+                width: 3632,
+                height: 2352,
+                // Transform relative to previous map
+                scaleFactor: 0.3333,
+                offsetX: 266.39,
+                offsetY: 169.76
+            },
+            rs3: {
+                path: 'Rs_map_2023.04.11.png',
+                name: '11 April 2023 Runescape 3',
+                width: 3829,
+                height: 3200,
+                // Transform relative to previous map
+                scaleFactor: 0.4997,
+                offsetX: -1132.55,
+                offsetY: 707.60
+            }
+        };
+        
+        // State
+        const state = {
+            map1: 'current',
+            map2: 'previous',
+            images: {},
+            canvas: null,
+            ctx: null,
+            mode: 'split',
+            splitPos: 0.5,
+            opacity: 0.5,
+            zoom: 0.16,
+            viewX: -1083,
+            viewY: -141,
+            isDragging: false,
+            dragStartX: 0,
+            dragStartY: 0,
+            dragStartViewX: 0,
+            dragStartViewY: 0,
+            isDraggingSplit: false,
+            renderScheduled: false,
+            // Touch/pinch zoom
+            lastTouchDistance: 0,
+            touchStartZoom: 1,
+            touchCenterX: 0,
+            touchCenterY: 0
+        };
+        
+        // Initialize
+        async function init() {
+            state.canvas = document.getElementById('canvas');
+            state.ctx = state.canvas.getContext('2d', { alpha: false });
+            
+            // Disable image smoothing for crisp pixels when zoomed
+            state.ctx.imageSmoothingEnabled = false;
+            
+            await loadImages();
+            resizeCanvas();
+            setupMouseEvents();
+            setupTouchEvents();
+            setupControls();
+            
+            window.addEventListener('resize', () => {
+                resizeCanvas();
+                render();
+            });
+            
+            // Add keyboard shortcuts
+            window.addEventListener('keydown', (e) => {
+                switch(e.key) {
+                    case '1':
+                        state.mode = 'split';
+                        scheduleRender();
+                        break;
+                    case '2':
+                        state.mode = 'overlay';
+                        scheduleRender();
+                        break;
+                    case '3':
+                        state.mode = 'old';
+                        scheduleRender();
+                        break;
+                    case '4':
+                        state.mode = 'new';
+                        scheduleRender();
+                        break;
+                    case '0':
+                        state.viewX = -1083;
+                        state.viewY = -141;
+                        state.zoom = 0.16;
+                        scheduleRender();
+                        break;
+                }
+            });
+            
+            document.getElementById('loading').style.display = 'none';
+            render();
+        }
+        
+        function setupControls() {
+            document.getElementById('map1Select').addEventListener('change', (e) => {
+                state.map1 = e.target.value;
+                render();
+            });
+            
+            document.getElementById('map2Select').addEventListener('change', (e) => {
+                state.map2 = e.target.value;
+                render();
+            });
+        }
+        
+        async function loadImages() {
+            const loadPromises = Object.entries(MAPS).map(([key, config]) => {
+                return new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.onload = async () => {
+                        try {
+                            await img.decode();
+                        } catch (e) {
+                            console.warn(`Image decode failed for ${config.name}`, e);
+                        }
+                        state.images[key] = img;
+                        console.log(`Loaded ${config.name}: ${config.width}x${config.height}`);
+                        resolve();
+                    };
+                    img.onerror = () => reject(`Failed to load ${config.name}`);
+                    img.src = config.path;
+                });
+            });
+            
+            await Promise.all(loadPromises);
+        }
+        
+        function resizeCanvas() {
+            const container = document.getElementById('canvas-container');
+            state.canvas.width = container.clientWidth;
+            state.canvas.height = container.clientHeight;
+            
+            // Reapply after resize
+            state.ctx.imageSmoothingEnabled = false;
+        }
+        
+        function scheduleRender() {
+            if (!state.renderScheduled) {
+                state.renderScheduled = true;
+                requestAnimationFrame(() => {
+                    state.renderScheduled = false;
+                    render();
+                });
+            }
+        }
+        
+        function setupMouseEvents() {
+            const container = document.getElementById('canvas-container');
+            
+            container.addEventListener('mousedown', (e) => {
+                const rect = state.canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const splitX = state.canvas.width * state.splitPos;
+                
+                // Check if clicking near split line (within 10px)
+                if (state.mode === 'split' && Math.abs(mouseX - splitX) < 10) {
+                    state.isDraggingSplit = true;
+                    container.style.cursor = 'ew-resize';
+                } else {
+                    state.isDragging = true;
+                    state.dragStartX = e.clientX;
+                    state.dragStartY = e.clientY;
+                    state.dragStartViewX = state.viewX;
+                    state.dragStartViewY = state.viewY;
+                    container.classList.add('dragging');
+                }
+            });
+            
+            container.addEventListener('mousemove', (e) => {
+                const rect = state.canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const splitX = state.canvas.width * state.splitPos;
+                
+                if (state.isDraggingSplit) {
+                    // Update split position
+                    state.splitPos = Math.max(0, Math.min(1, mouseX / state.canvas.width));
+                    scheduleRender();
+                } else if (state.isDragging) {
+                    const dx = (e.clientX - state.dragStartX) / state.zoom;
+                    const dy = (e.clientY - state.dragStartY) / state.zoom;
+                    state.viewX = state.dragStartViewX - dx;
+                    state.viewY = state.dragStartViewY - dy;
+                    scheduleRender();
+                } else {
+                    // Show resize cursor when hovering over split line
+                    if (state.mode === 'split' && Math.abs(mouseX - splitX) < 10) {
+                        container.style.cursor = 'ew-resize';
+                    } else {
+                        container.style.cursor = 'grab';
+                    }
+                }
+            });
+            
+            container.addEventListener('mouseup', () => {
+                state.isDragging = false;
+                state.isDraggingSplit = false;
+                container.classList.remove('dragging');
+                container.style.cursor = 'grab';
+            });
+            
+            container.addEventListener('mouseleave', () => {
+                state.isDragging = false;
+                state.isDraggingSplit = false;
+                container.classList.remove('dragging');
+                container.style.cursor = 'grab';
+            });
+            
+            container.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                
+                const rect = state.canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                
+                // Get world position before zoom
+                const worldX = state.viewX + mouseX / state.zoom;
+                const worldY = state.viewY + mouseY / state.zoom;
+                
+                // Update zoom
+                const zoomDelta = e.deltaY > 0 ? 0.9 : 1.1;
+                const newZoom = Math.max(0.1, Math.min(5, state.zoom * zoomDelta));
+                
+                // Adjust view to keep mouse position fixed
+                state.zoom = newZoom;
+                state.viewX = worldX - mouseX / state.zoom;
+                state.viewY = worldY - mouseY / state.zoom;
+                
+                scheduleRender();
+            }, { passive: false });
+        }
+        
+        function setupTouchEvents() {
+            const container = document.getElementById('canvas-container');
+            
+            container.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1) {
+                    // Single touch - pan or split drag
+                    const touch = e.touches[0];
+                    const rect = state.canvas.getBoundingClientRect();
+                    const touchX = touch.clientX - rect.left;
+                    const splitX = state.canvas.width * state.splitPos;
+                    
+                    // Check if touching near split line
+                    if (state.mode === 'split' && Math.abs(touchX - splitX) < 30) {
+                        state.isDraggingSplit = true;
+                    } else {
+                        state.isDragging = true;
+                        state.dragStartX = touch.clientX;
+                        state.dragStartY = touch.clientY;
+                        state.dragStartViewX = state.viewX;
+                        state.dragStartViewY = state.viewY;
+                    }
+                } else if (e.touches.length === 2) {
+                    // Two finger pinch zoom
+                    e.preventDefault();
+                    const touch1 = e.touches[0];
+                    const touch2 = e.touches[1];
+                    
+                    const dx = touch2.clientX - touch1.clientX;
+                    const dy = touch2.clientY - touch1.clientY;
+                    state.lastTouchDistance = Math.sqrt(dx * dx + dy * dy);
+                    state.touchStartZoom = state.zoom;
+                    
+                    // Center point between fingers
+                    const rect = state.canvas.getBoundingClientRect();
+                    state.touchCenterX = (touch1.clientX + touch2.clientX) / 2 - rect.left;
+                    state.touchCenterY = (touch1.clientY + touch2.clientY) / 2 - rect.top;
+                }
+            }, { passive: false });
+            
+            container.addEventListener('touchmove', (e) => {
+                if (e.touches.length === 1) {
+                    const touch = e.touches[0];
+                    const rect = state.canvas.getBoundingClientRect();
+                    const touchX = touch.clientX - rect.left;
+                    
+                    if (state.isDraggingSplit) {
+                        e.preventDefault();
+                        state.splitPos = Math.max(0, Math.min(1, touchX / state.canvas.width));
+                        scheduleRender();
+                    } else if (state.isDragging) {
+                        e.preventDefault();
+                        const dx = (touch.clientX - state.dragStartX) / state.zoom;
+                        const dy = (touch.clientY - state.dragStartY) / state.zoom;
+                        state.viewX = state.dragStartViewX - dx;
+                        state.viewY = state.dragStartViewY - dy;
+                        scheduleRender();
+                    }
+                } else if (e.touches.length === 2) {
+                    e.preventDefault();
+                    const touch1 = e.touches[0];
+                    const touch2 = e.touches[1];
+                    
+                    const dx = touch2.clientX - touch1.clientX;
+                    const dy = touch2.clientY - touch1.clientY;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (state.lastTouchDistance > 0) {
+                        // Calculate zoom
+                        const zoomFactor = distance / state.lastTouchDistance;
+                        const worldX = state.viewX + state.touchCenterX / state.zoom;
+                        const worldY = state.viewY + state.touchCenterY / state.zoom;
+                        
+                        const newZoom = Math.max(0.1, Math.min(5, state.touchStartZoom * zoomFactor));
+                        state.zoom = newZoom;
+                        
+                        // Adjust view to keep center point fixed
+                        state.viewX = worldX - state.touchCenterX / state.zoom;
+                        state.viewY = worldY - state.touchCenterY / state.zoom;
+                        
+                        scheduleRender();
+                    }
+                }
+            }, { passive: false });
+            
+            container.addEventListener('touchend', (e) => {
+                if (e.touches.length === 0) {
+                    state.isDragging = false;
+                    state.isDraggingSplit = false;
+                    state.lastTouchDistance = 0;
+                }
+            }, { passive: false });
+            
+            container.addEventListener('touchcancel', (e) => {
+                state.isDragging = false;
+                state.isDraggingSplit = false;
+                state.lastTouchDistance = 0;
+            }, { passive: false });
+        }
+        
+        function render() {
+            const ctx = state.ctx;
+            const canvas = state.canvas;
+            
+            // Clear
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Render based on mode
+            switch (state.mode) {
+                case 'split':
+                    renderSplitView();
+                    break;
+                case 'overlay':
+                    renderOverlay();
+                    break;
+                case 'old':
+                    renderSingle(null, false);
+                    break;
+                case 'new':
+                    renderSingle(null, true);
+                    break;
+                case 'difference':
+                    renderDifference();
+                    break;
+            }
+            
+            updateInfo();
+        }
+        
+        function renderSplitView() {
+            const ctx = state.ctx;
+            const canvas = state.canvas;
+            const splitX = canvas.width * state.splitPos;
+            
+            // Left side - Old map
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, 0, splitX, canvas.height);
+            ctx.clip();
+            drawOldMap();
+            ctx.restore();
+            
+            // Right side - New map
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(splitX, 0, canvas.width - splitX, canvas.height);
+            ctx.clip();
+            drawNewMap();
+            ctx.restore();
+            
+            // Split line
+            ctx.strokeStyle = '#ffb000';
+            ctx.lineWidth = 3;
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+            ctx.shadowBlur = 5;
+            ctx.beginPath();
+            ctx.moveTo(splitX, 0);
+            ctx.lineTo(splitX, canvas.height);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+        
+        function renderOverlay() {
+            const ctx = state.ctx;
+            
+            // Old map
+            ctx.globalAlpha = 1 - state.opacity;
+            drawOldMap();
+            
+            // New map
+            ctx.globalAlpha = state.opacity;
+            drawNewMap();
+            
+            ctx.globalAlpha = 1.0;
+        }
+        
+        function renderSingle(img, isNewMap = false) {
+            if (isNewMap) {
+                drawNewMap();
+            } else {
+                drawOldMap();
+            }
+        }
+        
+        function renderDifference() {
+            const ctx = state.ctx;
+            
+            ctx.globalAlpha = 0.5;
+            drawOldMap();
+            
+            ctx.globalCompositeOperation = 'difference';
+            ctx.globalAlpha = 0.5;
+            drawNewMap();
+            
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = 1.0;
+        }
+        
+        function drawOldMap() {
+            drawMap(state.map1);
+        }
+        
+        function drawNewMap() {
+            drawMap(state.map2);
+        }
+        
+        function drawMap(mapKey) {
+            const ctx = state.ctx;
+            const config = MAPS[mapKey];
+            const img = state.images[mapKey];
+            
+            if (!img || !config) return;
+            
+            ctx.save();
+            
+            // Transform to reference map (old map) coordinate space
+            ctx.translate(-state.viewX * state.zoom, -state.viewY * state.zoom);
+            ctx.scale(state.zoom, state.zoom);
+            
+            // Apply sync transformation relative to reference map
+            const scale = 1 / config.scaleFactor;
+            ctx.translate(-config.offsetX * scale, -config.offsetY * scale);
+            ctx.scale(scale, scale);
+            
+            ctx.drawImage(img, 0, 0);
+            ctx.restore();
+        }
+        
+        function updateInfo() {
+            const map1Config = MAPS[state.map1];
+            const map2Config = MAPS[state.map2];
+            
+            if (map1Config) {
+                document.getElementById('oldMapInfo').textContent = 
+                    `${map1Config.name} (${map1Config.width} × ${map1Config.height})`;
+            }
+            
+            if (map2Config) {
+                document.getElementById('newMapInfo').textContent = 
+                    `${map2Config.name} (${map2Config.width} × ${map2Config.height})`;
+            }
+            
+            document.getElementById('posInfo').textContent = 
+                `View: (${Math.round(state.viewX)}, ${Math.round(state.viewY)}) | Zoom: ${Math.round(state.zoom * 100)}%`;
+        }
+        
+        // Start the application
+        init().catch(error => {
+            document.getElementById('loading').innerHTML = 
+                '<div style="color: #ff4444;">Error: ' + error + '</div>';
+        });
+    </script>
+</body>
+</html>
