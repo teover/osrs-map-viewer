@@ -148,22 +148,28 @@
         <div class="control-group">
             <label for="map1Select">Left/Base Map:</label>
             <select id="map1Select">
-                <option value="previous">4 August 2025 Previous map</option>
-                <option value="sailingBeta">26 June 2025 Sailing beta</option>
-                <option value="current" selected>5 November 2025 Current Map</option>
+                <option value="previous">OSRS: 4 August 2025</option>
+                <option value="sailingBeta">OSRS: 26 June 2025 Sailing Beta</option>
+                <option value="current" selected>OSRS: 5 November 2025</option>
                 <!-- Updated name below -->
                 
-                <option value="rs3">11 April 2023 Runescape 3</option>
+                <option value="rs3">RS3: 11 April 2023</option>
+                <option value="rs2">RS2: Map</option>
+                <option value="jan2001">Classic: January 2001</option>
+                <option value="mar2003">Classic: March 2003</option>
             </select>
         </div>
         <div class="control-group">
             <label for="map2Select">Right/Overlay Map:</label>
             <select id="map2Select">
-                <option value="previous" selected>4 August 2025 Previous map</option>
-                <option value="sailingBeta">26 June 2025 Sailing beta</option>
-                <option value="current">5 November 2025 Current Map</option>
+                <option value="previous" selected>OSRS: 4 August 2025</option>
+                <option value="sailingBeta">OSRS: 26 June 2025 Sailing Beta</option>
+                <option value="current">OSRS: 5 November 2025</option>
                 <!-- Updated name below -->
-                <option value="rs3">11 April 2023 Runescape 3</option>
+                <option value="rs3">RS3: 11 April 2023</option>
+                <option value="rs2">RS2: Map</option>
+                <option value="jan2001">Classic: January 2001</option>
+                <option value="mar2003">Classic: March 2003</option>
             </select>
         </div>
     </div>
@@ -183,7 +189,7 @@
         const MAPS = {
             previous: {
                 path: 'osrs_old_map.png',
-                name: '4 August 2025 Previous map',
+                name: 'OSRS: 4 August 2025',
                 width: 8712,
                 height: 4912,
                 // Identity transform (reference map)
@@ -193,7 +199,7 @@
             },
             sailingBeta: {
                 path: 'Sailing_beta_world_map.png',
-                name: '26 June 2025 Sailing beta',
+                name: 'OSRS: 26 June 2025 Sailing Beta',
                 width: 12800,
                 height: 8704,
                 // Transform relative to previous map
@@ -203,7 +209,7 @@
             },
             current: {
                 path: 'current_map.png',
-                name: '5 November 2025 Current Map',
+                name: 'OSRS: 5 November 2025',
                 width: 8832,
                 height: 6144,
                 // Transform relative to previous map
@@ -213,13 +219,42 @@
             },
             rs3: {
                 path: 'Rs_map_2023.04.11.png',
-                name: '11 April 2023 Runescape 3',
+                name: 'RS3: 11 April 2023',
                 width: 3829,
                 height: 3200,
                 // Transform relative to previous map
                 scaleFactor: 0.4997,
                 offsetX: -1132.55,
                 offsetY: 707.60
+            },
+            rs2: {
+                path: 'Rs2-map.png',
+                name: 'RS2: Map',
+                width: 2111,
+                height: 2179,
+                scaleFactor: 0.6669,
+                offsetX: -2579.59,
+                offsetY: -309.68
+            },
+            jan2001: {
+                path: 'Map-January-2001.png',
+                name: 'Classic: January 2001',
+                width: 569,
+                height: 852,
+                // Calculated relative to March 2003
+                scaleFactor: 0.7463,
+                offsetX: -4529.76,
+                offsetY: -1369.67
+            },
+            mar2003: {
+                path: 'Map-March-2003.png',
+                name: 'Classic: March 2003',
+                width: 2152,
+                height: 1007,
+                // Calculated by analyze_maps_legacy.py
+                scaleFactor: 0.7463,
+                offsetX: -2947.76,
+                offsetY: -1365.67
             }
         };
         
